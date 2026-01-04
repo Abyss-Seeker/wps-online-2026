@@ -1,0 +1,5 @@
+{
+  "name": "Secret Doc Filler",
+  "description": "A document editor interface that converts uploaded text files into a structured opinion summary table.",
+  "requestFramePermissions": []
+}
