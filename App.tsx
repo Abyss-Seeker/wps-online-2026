@@ -67,6 +67,9 @@ const App: React.FC = () => {
   const [showRowsDialog, setShowRowsDialog] = useState(false);
   const [tempRows, setTempRows] = useState('');
 
+  const [showJumpDialog, setShowJumpDialog] = useState(false);
+  const [tempPageNum, setTempPageNum] = useState('');
+
   // --- Actions ---
 
   const handleFileUpload = (file: File) => {
@@ -144,6 +147,22 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Jump To Page Dialog Handlers ---
+  const handleOpenJumpDialog = () => {
+    setTempPageNum('');
+    setShowJumpDialog(true);
+  };
+
+  const handleJumpToPage = () => {
+    const page = parseInt(tempPageNum, 10);
+    if (!isNaN(page) && page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      setShowJumpDialog(false);
+    } else {
+      alert(`请输入有效的页码 (1 - ${totalPages})`);
+    }
+  };
+
   // --- Data Updating ---
 
   const handleUpdateRow = (id: number, field: keyof TableRow, value: string) => {
@@ -173,7 +192,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (showShortcutDialog || showRowsDialog) return;
+      if (showShortcutDialog || showRowsDialog || showJumpDialog) return;
 
       const targetKey = shortcut.toLowerCase();
       const pressedKey = e.key.toLowerCase();
@@ -193,7 +212,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shortcut, handleRestore, showShortcutDialog, showRowsDialog]);
+  }, [shortcut, handleRestore, showShortcutDialog, showRowsDialog, showJumpDialog]);
 
   // Calculate stats
   const wordCount = data.reduce((acc, row) => acc + row.opinionContent.length + row.modificationSuggestion.length, 0);
@@ -214,6 +233,7 @@ const App: React.FC = () => {
         onNextPage={handleNextPage}
         autoScroll={autoScroll}
         onToggleAutoScroll={handleToggleAutoScroll}
+        onJumpToPage={handleOpenJumpDialog}
       />
       
       <DocumentViewer 
@@ -307,6 +327,47 @@ const App: React.FC = () => {
                   className="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-500 text-sm font-medium transition-colors"
                  >
                    保存设置
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Jump To Page Modal */}
+      {showJumpDialog && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-sm">
+           <div className="bg-[#2d2d2d] border border-[#444] p-6 rounded-lg shadow-2xl w-[350px] text-gray-300">
+              <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+                跳转到指定页
+              </h3>
+              
+              <div className="mb-6">
+                <label className="block text-xs text-gray-400 mb-2">请输入页码 (1 - {totalPages}):</label>
+                <input 
+                  autoFocus
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  className="w-full bg-[#1e1e1e] border border-[#444] p-2 rounded text-white focus:outline-none focus:border-blue-500 font-mono text-center text-lg"
+                  value={tempPageNum}
+                  onChange={(e) => setTempPageNum(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
+                  placeholder={`当前: ${currentPage}`}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-[#444] pt-4">
+                 <button 
+                  onClick={() => setShowJumpDialog(false)} 
+                  className="px-4 py-1.5 border border-[#444] rounded hover:bg-[#3d3d3d] text-sm transition-colors"
+                 >
+                   取消
+                 </button>
+                 <button 
+                  onClick={handleJumpToPage} 
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-500 text-sm font-medium transition-colors"
+                 >
+                   跳转
                  </button>
               </div>
            </div>

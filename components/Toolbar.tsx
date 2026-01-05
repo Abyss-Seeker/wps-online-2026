@@ -20,6 +20,7 @@ interface ToolbarProps {
   onNextPage: () => void;
   autoScroll: boolean;
   onToggleAutoScroll: () => void;
+  onJumpToPage: () => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({ 
@@ -31,7 +32,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onPrevPage,
   onNextPage,
   autoScroll,
-  onToggleAutoScroll
+  onToggleAutoScroll,
+  onJumpToPage
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
@@ -277,7 +279,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         {/* Editing Section */}
          <div className="flex flex-col gap-2 px-2 h-full justify-center text-gray-300">
-             <div className="flex items-center gap-2 cursor-pointer hover:text-white">
+             <div 
+                className="flex items-center gap-2 cursor-pointer hover:text-white"
+                onClick={onJumpToPage}
+                title="跳转到指定页"
+             >
                  <Search size={16} /> <span>查找</span>
              </div>
              <div className="flex items-center gap-2 cursor-pointer hover:text-white">
