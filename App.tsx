@@ -2,40 +2,70 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Toolbar from './components/Toolbar';
 import DocumentViewer from './components/DocumentViewer';
 import StatusBar from './components/StatusBar';
-import { TableRow } from './types';
-import { parseTextToRows, generateInitialData } from './utils';
+import { TableRow, DocumentMeta } from './types';
+import { parseTextToRows, generateInitialData, generateInitialMeta } from './utils';
 
 const STORAGE_KEY_DATA = 'wps_clone_default_data';
+const STORAGE_KEY_META = 'wps_clone_default_meta';
 const STORAGE_KEY_SHORTCUT = 'wps_clone_shortcut';
+const STORAGE_KEY_ROWS = 'wps_clone_rows_per_page';
+const STORAGE_KEY_AUTO_SCROLL = 'wps_clone_auto_scroll';
 
 const App: React.FC = () => {
-  // 1. Initialize data. 
-  // We use a ref for the default state to ensure "Violent" instant access (zero disk/parsing latency on restore).
   const defaultDataRef = useRef<TableRow[]>([]);
+  const defaultMetaRef = useRef<DocumentMeta>(generateInitialMeta());
 
-  // Load initial state
-  const initializeState = (): TableRow[] => {
+  // --- Initialization ---
+  
+  const initializeState = () => {
+    let initialData: TableRow[];
+    let initialMeta: DocumentMeta;
+
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_DATA);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        defaultDataRef.current = parsed;
-        return parsed;
-      }
+      const savedData = localStorage.getItem(STORAGE_KEY_DATA);
+      const savedMeta = localStorage.getItem(STORAGE_KEY_META);
+      
+      initialData = savedData ? JSON.parse(savedData) : generateInitialData();
+      initialMeta = savedMeta ? JSON.parse(savedMeta) : generateInitialMeta();
     } catch (e) {
-      console.error("Failed to load saved default", e);
+      initialData = generateInitialData();
+      initialMeta = generateInitialMeta();
     }
-    const initial = generateInitialData();
-    defaultDataRef.current = initial;
-    return initial;
+
+    defaultDataRef.current = initialData;
+    defaultMetaRef.current = initialMeta;
+
+    return { data: initialData, meta: initialMeta };
   };
 
-  const [data, setData] = useState<TableRow[]>(initializeState);
+  const [data, setData] = useState<TableRow[]>(() => initializeState().data);
+  const [meta, setMeta] = useState<DocumentMeta>(() => initializeState().meta);
+  
   const [shortcut, setShortcut] = useState<string>(() => localStorage.getItem(STORAGE_KEY_SHORTCUT) || 'F9');
   
-  // Modal State
+  // Configurable Rows Per Page (Default 200)
+  const [rowsPerPage, setRowsPerPage] = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_ROWS);
+    const parsed = saved ? parseInt(saved, 10) : 200;
+    return isNaN(parsed) || parsed < 1 ? 200 : parsed;
+  });
+
+  // Auto Scroll Setting (Default true)
+  const [autoScroll, setAutoScroll] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_AUTO_SCROLL);
+    return saved === null ? true : saved === 'true';
+  });
+
+  // Pagination State (Virtualization)
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(data.length / rowsPerPage) || 1;
+
+  // Modals State
   const [showShortcutDialog, setShowShortcutDialog] = useState(false);
   const [tempShortcut, setTempShortcut] = useState('');
+  
+  const [showRowsDialog, setShowRowsDialog] = useState(false);
+  const [tempRows, setTempRows] = useState('');
 
   // --- Actions ---
 
@@ -44,24 +74,30 @@ const App: React.FC = () => {
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (text) {
-        // Parse uploaded text and mix with dummy data in checkerboard pattern
         const rows = parseTextToRows(text);
         setData(rows);
+        setCurrentPage(1); // Reset to page 1 on new load
       }
     };
     reader.readAsText(file);
   };
 
   const handleRestore = useCallback(() => {
-    // VIOLENT RESTORE: Synchronous state update from memory. Zero latency.
+    // VIOLENT RESTORE: Synchronous state update from memory.
     setData([...defaultDataRef.current]); 
+    setMeta({...defaultMetaRef.current});
+    setCurrentPage(1); // Reset to page 1
   }, []);
 
   const handleSaveAsDefault = () => {
-    if (window.confirm("是否将当前文档视图保存为“默认工作状态”？\n(按恢复键时将瞬间回到此状态)")) {
+    if (window.confirm("是否将当前文档视图（包括标题、正文、样式）保存为“默认工作状态”？\n(按恢复键时将瞬间回到此状态)")) {
       try {
         localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(data));
-        defaultDataRef.current = [...data]; // Update the memory ref immediately
+        localStorage.setItem(STORAGE_KEY_META, JSON.stringify(meta));
+        
+        defaultDataRef.current = [...data];
+        defaultMetaRef.current = {...meta};
+        
         alert("设置成功！当前状态已保存为默认恢复状态。");
       } catch (e) {
         alert("保存失败，可能是数据量过大。");
@@ -69,7 +105,13 @@ const App: React.FC = () => {
     }
   };
 
-  // Open the custom modal instead of prompt
+  const handleToggleAutoScroll = () => {
+    const newValue = !autoScroll;
+    setAutoScroll(newValue);
+    localStorage.setItem(STORAGE_KEY_AUTO_SCROLL, String(newValue));
+  };
+
+  // --- Shortcut Dialog Handlers ---
   const handleOpenShortcutDialog = () => {
     setTempShortcut(shortcut);
     setShowShortcutDialog(true);
@@ -84,6 +126,26 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Rows Per Page Dialog Handlers ---
+  const handleOpenRowsDialog = () => {
+    setTempRows(rowsPerPage.toString());
+    setShowRowsDialog(true);
+  };
+
+  const handleSaveRows = () => {
+    const parsed = parseInt(tempRows, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      setRowsPerPage(parsed);
+      localStorage.setItem(STORAGE_KEY_ROWS, parsed.toString());
+      setCurrentPage(1); // Reset to page 1 to avoid out of bounds
+      setShowRowsDialog(false);
+    } else {
+      alert("请输入有效的数字 (大于 0)");
+    }
+  };
+
+  // --- Data Updating ---
+
   const handleUpdateRow = (id: number, field: keyof TableRow, value: string) => {
     setData(prev => prev.map(row => {
       if (row.id === id) {
@@ -93,23 +155,33 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleUpdateMeta = (field: keyof DocumentMeta, value: string) => {
+    setMeta(prev => ({ ...prev, [field]: value }));
+  };
+
+  // --- Pagination Control ---
+
+  const handlePrevPage = () => {
+    setCurrentPage(p => Math.max(1, p - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(p => Math.min(totalPages, p + 1));
+  };
+
   // --- Keyboard Listener ---
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if modal is open
-      if (showShortcutDialog) return;
+      if (showShortcutDialog || showRowsDialog) return;
 
-      // Check for match. Support single letters (assumed with Alt) or Function keys
       const targetKey = shortcut.toLowerCase();
       const pressedKey = e.key.toLowerCase();
 
       let match = false;
       if (targetKey.length === 1) {
-         // Single letter -> Require Alt modifier to avoid typing accidents
          if (e.altKey && pressedKey === targetKey) match = true;
       } else {
-         // Function keys or specific keys (Enter, Escape, F1...) -> No modifier needed
          if (pressedKey === targetKey) match = true;
       }
 
@@ -121,9 +193,14 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shortcut, handleRestore, showShortcutDialog]);
+  }, [shortcut, handleRestore, showShortcutDialog, showRowsDialog]);
 
+  // Calculate stats
   const wordCount = data.reduce((acc, row) => acc + row.opinionContent.length + row.modificationSuggestion.length, 0);
+
+  // Slice data for virtualization
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const currentData = data.slice(startIndex, startIndex + rowsPerPage);
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e1e] relative">
@@ -132,13 +209,26 @@ const App: React.FC = () => {
         onRestore={handleRestore}
         onConfigDefault={handleSaveAsDefault}
         onConfigShortcut={handleOpenShortcutDialog}
+        onConfigRowsPerPage={handleOpenRowsDialog}
+        onPrevPage={handlePrevPage}
+        onNextPage={handleNextPage}
+        autoScroll={autoScroll}
+        onToggleAutoScroll={handleToggleAutoScroll}
       />
       
-      <DocumentViewer data={data} onUpdateRow={handleUpdateRow} />
+      <DocumentViewer 
+        data={currentData} 
+        meta={meta}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onUpdateRow={handleUpdateRow}
+        onUpdateMeta={handleUpdateMeta}
+        autoScroll={autoScroll}
+      />
       
-      <StatusBar pageCount={Math.ceil(data.length / 5)} wordCount={wordCount} />
+      <StatusBar pageCount={totalPages} wordCount={wordCount} currentPage={currentPage} />
 
-      {/* Custom Shortcut Settings Modal */}
+      {/* Shortcut Settings Modal */}
       {showShortcutDialog && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-sm">
            <div className="bg-[#2d2d2d] border border-[#444] p-6 rounded-lg shadow-2xl w-[400px] text-gray-300">
@@ -172,6 +262,48 @@ const App: React.FC = () => {
                  </button>
                  <button 
                   onClick={handleSaveShortcut} 
+                  className="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-500 text-sm font-medium transition-colors"
+                 >
+                   保存设置
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Rows Per Page Settings Modal */}
+      {showRowsDialog && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-sm">
+           <div className="bg-[#2d2d2d] border border-[#444] p-6 rounded-lg shadow-2xl w-[350px] text-gray-300">
+              <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
+                设置每页行数
+              </h3>
+              
+              <div className="mb-6">
+                <label className="block text-xs text-gray-400 mb-2">请输入每页显示的表格行数:</label>
+                <input 
+                  autoFocus
+                  type="number"
+                  min="1"
+                  className="w-full bg-[#1e1e1e] border border-[#444] p-2 rounded text-white focus:outline-none focus:border-blue-500 font-mono text-center text-lg"
+                  value={tempRows}
+                  onChange={(e) => setTempRows(e.target.value)}
+                  placeholder="默认: 200"
+                />
+                <p className="text-[11px] text-gray-500 mt-2">
+                  默认值为 200 行。行数越多，页面越长。
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-[#444] pt-4">
+                 <button 
+                  onClick={() => setShowRowsDialog(false)} 
+                  className="px-4 py-1.5 border border-[#444] rounded hover:bg-[#3d3d3d] text-sm transition-colors"
+                 >
+                   取消
+                 </button>
+                 <button 
+                  onClick={handleSaveRows} 
                   className="px-4 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-500 text-sm font-medium transition-colors"
                  >
                    保存设置

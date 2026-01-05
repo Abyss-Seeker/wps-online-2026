@@ -5,8 +5,8 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, ChevronDown, 
   Search, Minus, Square, X,
-  Save, Undo, Redo, Bell, User, LayoutGrid, FileSearch, MessageSquareText,
-  RotateCcw, Settings
+  Save, Undo, Redo, Bell, Settings,
+  RotateCcw, FileSearch, MessageSquareText, LayoutGrid
 } from 'lucide-react';
 import { MENUS, STYLES } from '../constants';
 
@@ -15,9 +15,24 @@ interface ToolbarProps {
   onRestore: () => void;
   onConfigDefault: () => void;
   onConfigShortcut: () => void;
+  onConfigRowsPerPage: () => void;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+  autoScroll: boolean;
+  onToggleAutoScroll: () => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onFileUpload, onRestore, onConfigDefault, onConfigShortcut }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ 
+  onFileUpload, 
+  onRestore, 
+  onConfigDefault, 
+  onConfigShortcut,
+  onConfigRowsPerPage,
+  onPrevPage,
+  onNextPage,
+  autoScroll,
+  onToggleAutoScroll
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
 
@@ -85,16 +100,32 @@ const Toolbar: React.FC<ToolbarProps> = ({ onFileUpload, onRestore, onConfigDefa
             {showConfigMenu && (
               <div className="absolute top-8 right-10 bg-[#2d2d2d] border border-[#444] rounded shadow-xl p-1 w-48 z-50 flex flex-col gap-1 text-gray-300">
                 <button 
-                  className="text-left px-2 py-1 hover:bg-[#3d3d3d] rounded text-[11px]"
+                  className="text-left px-2 py-1.5 hover:bg-[#3d3d3d] rounded text-[11px] w-full"
                   onClick={() => { setShowConfigMenu(false); onConfigDefault(); }}
                 >
                   保存当前界面为默认
                 </button>
                 <button 
-                  className="text-left px-2 py-1 hover:bg-[#3d3d3d] rounded text-[11px]"
+                  className="text-left px-2 py-1.5 hover:bg-[#3d3d3d] rounded text-[11px] w-full"
                   onClick={() => { setShowConfigMenu(false); onConfigShortcut(); }}
                 >
                   设置一键恢复快捷键
+                </button>
+                <div className="h-[1px] bg-[#444] my-1"></div>
+                <button 
+                  className="text-left px-2 py-1.5 hover:bg-[#3d3d3d] rounded text-[11px] w-full"
+                  onClick={() => { setShowConfigMenu(false); onConfigRowsPerPage(); }}
+                >
+                  设置每页行数 (渲染优化)
+                </button>
+                <button 
+                  className="text-left px-2 py-1.5 hover:bg-[#3d3d3d] rounded text-[11px] w-full flex justify-between items-center"
+                  onClick={() => { onToggleAutoScroll(); }}
+                >
+                  <span>翻页自动滚动</span>
+                  <span className={autoScroll ? "text-green-400" : "text-gray-500"}>
+                    {autoScroll ? "开启" : "关闭"}
+                  </span>
                 </button>
               </div>
             )}
@@ -169,8 +200,20 @@ const Toolbar: React.FC<ToolbarProps> = ({ onFileUpload, onRestore, onConfigDefa
                     <ChevronDown size={12} />
                 </div>
                 <div className="flex items-center gap-1">
-                     <div className="px-1 hover:bg-[#333] rounded cursor-pointer font-serif font-bold text-lg">A<span className="text-[10px] align-top">^</span></div>
-                     <div className="px-1 hover:bg-[#333] rounded cursor-pointer font-serif text-sm">A<span className="text-[10px] align-top">v</span></div>
+                     <div 
+                        className="px-1 hover:bg-[#333] rounded cursor-pointer font-serif font-bold text-lg active:scale-90 select-none"
+                        onClick={onPrevPage}
+                        title="上一页 (Prev Page)"
+                     >
+                        A<span className="text-[10px] align-top">^</span>
+                     </div>
+                     <div 
+                        className="px-1 hover:bg-[#333] rounded cursor-pointer font-serif text-sm active:scale-90 select-none"
+                        onClick={onNextPage}
+                        title="下一页 (Next Page)"
+                     >
+                        A<span className="text-[10px] align-top">v</span>
+                     </div>
                 </div>
             </div>
             <div className="flex gap-2 items-center">

@@ -1,4 +1,4 @@
-import { TableRow } from './types';
+import { TableRow, DocumentMeta } from './types';
 
 // --- Realism Data Sets ---
 
@@ -108,6 +108,18 @@ const generateClauseNumber = (index: number): string => {
 
 // --- Generators ---
 
+export const generateInitialMeta = (): DocumentMeta => ({
+  title: "意见汇总表",
+  projectName: "标准项目名称：人形机器人技术要求 第6部分：定位导航",
+  draftingUnitLabel: "负责起草单位：",
+  draftingUnitValue: "",
+  pageInfoPrefix: "共",
+  pageInfoSuffix: "页 第",
+  contractorLabel: "承办人：",
+  dateLabel: "年 月 日填写",
+  footerNote: "注：技术审查会时需填写“处理意见”。"
+});
+
 export const generateInitialData = (): TableRow[] => {
   const rows: TableRow[] = [];
   const count = 35; // Generate 35 rows initially
@@ -149,32 +161,22 @@ export const parseTextToRows = (text: string): TableRow[] => {
   }
 
   // 2. Mix with Dummy Data in Chess-board Pattern
-  // Pattern: 
-  // Row 0: [Real, Dummy]
-  // Row 1: [Dummy, Real]
-  // ...
   
   const rows: TableRow[] = [];
-  const minRows = 30; // Minimum rows to ensure "full" look
+  const minRows = 30; 
   const totalRows = Math.max(minRows, realChunks.length); 
 
   for (let i = 0; i < totalRows; i++) {
     const isEven = i % 2 === 0;
-    const realText = realChunks[i] || getRandom(DUMMY_OPINIONS); // Fallback to dummy if real text runs out
-    
-    // To ensure we use the real text effectively, we check if we still have real text available.
-    // However, the prompt implies "filling in the txt" so we prioritize showing the uploaded text.
+    const realText = realChunks[i] || getRandom(DUMMY_OPINIONS); 
     
     let opinion = "";
     let suggestion = "";
 
-    // Chess-board logic
     if (isEven) {
-      // Even Rows: Opinion = Real (or Dummy fallback), Suggestion = Dummy
       opinion = i < realChunks.length ? realText : getRandom(DUMMY_OPINIONS);
       suggestion = getRandom(DUMMY_SUGGESTIONS);
     } else {
-      // Odd Rows: Opinion = Dummy, Suggestion = Real (or Dummy fallback)
       opinion = getRandom(DUMMY_OPINIONS);
       suggestion = i < realChunks.length ? realText : getRandom(DUMMY_SUGGESTIONS);
     }

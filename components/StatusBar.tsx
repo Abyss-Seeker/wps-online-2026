@@ -4,13 +4,14 @@ import { Layout, Maximize, Minus, Plus, Sliders } from 'lucide-react';
 interface StatusBarProps {
   pageCount: number;
   wordCount: number;
+  currentPage: number;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ pageCount, wordCount }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ pageCount, wordCount, currentPage }) => {
   return (
     <div className="h-7 bg-[#1e1e1e] border-t border-[#333] flex items-center justify-between px-2 text-[11px] text-gray-400 select-none">
       <div className="flex items-center gap-4">
-        <span className="hover:bg-[#333] px-1 cursor-pointer">第 1 页，共 {pageCount} 页</span>
+        <span className="hover:bg-[#333] px-1 cursor-pointer">第 {currentPage} 页，共 {pageCount} 页</span>
         <span className="hover:bg-[#333] px-1 cursor-pointer">{wordCount} 个字</span>
         <span className="hover:bg-[#333] px-1 cursor-pointer flex items-center gap-1"><Layout size={12} /> 简体中文(中国大陆)</span>
         <span className="hover:bg-[#333] px-1 cursor-pointer flex items-center gap-1">辅助功能: 不可用</span>
